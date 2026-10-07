@@ -1,26 +1,48 @@
 import "./App.css";
 import { useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+} from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import Home from "./Home";
 import Products from "./Products";
 import Cart from "./Cart";
+import ProductDetails from "./ProductDetails";
 
 function App() {
   const [cart, setCart] = useState([]);
 
   return (
     <BrowserRouter>
+
       <Navbar />
 
       <Routes>
-        <Route path="/" element={<Home />} />
+
+        <Route
+          path="/"
+          element={<Home />}
+        />
 
         <Route
           path="/products"
           element={
             <Products
+              cart={cart}
+              setCart={setCart}
+            />
+          }
+        />
+
+        {/* PRODUCT DETAILS PAGE */}
+
+        <Route
+          path="/products/:productId"
+          element={
+            <ProductDetails
               cart={cart}
               setCart={setCart}
             />
@@ -36,7 +58,9 @@ function App() {
             />
           }
         />
+
       </Routes>
+
     </BrowserRouter>
   );
 }

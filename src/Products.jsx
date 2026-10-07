@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 function Products({ cart, setCart }) {
   const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [selectedCategory, setSelectedCategory] =
     useState("All");
@@ -20,16 +22,36 @@ function Products({ cart, setCart }) {
   // Get products
   useEffect(() => {
     fetch("http://localhost:5000/products")
-      .then((response) => response.json())
-      .then((data) => setProducts(data))
-      .catch((error) => console.log(error));
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to load products");
+        }
+
+        return response.json();
+      })
+      .then((data) => {
+        console.log("Products received:", data);
+
+        setProducts(data);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error(
+          "Product loading error:",
+          error
+        );
+
+        setLoading(false);
+      });
   }, []);
 
   // Categories
   const categories = [
     "All",
     ...new Set(
-      products.map((product) => product.category)
+      products
+        .map((product) => product.category)
+        .filter(Boolean)
     ),
   ];
 
@@ -43,32 +65,38 @@ function Products({ cart, setCart }) {
             selectedCategory === "All" ||
             product.category === selectedCategory
         )
-        .map((product) => product.subcategory)
-        .filter((subcategory) => subcategory)
+        .map(
+          (product) => product.subcategory
+        )
+        .filter(Boolean)
     ),
   ];
 
   // Add to cart
   const addToCart = (product) => {
     setCart((previousCart) => {
-      const existingProduct = previousCart.find(
-        (item) =>
-          item.product_id === product.product_id
-      );
+      const existingProduct =
+        previousCart.find(
+          (item) =>
+            item.product_id ===
+            product.product_id
+        );
 
       if (existingProduct) {
         if (
-          existingProduct.quantity >=
+          Number(existingProduct.quantity) >=
           Number(product.stock)
         ) {
           return previousCart;
         }
 
         return previousCart.map((item) =>
-          item.product_id === product.product_id
+          item.product_id ===
+          product.product_id
             ? {
                 ...item,
-                quantity: item.quantity + 1,
+                quantity:
+                  Number(item.quantity) + 1,
               }
             : item
         );
@@ -87,21 +115,27 @@ function Products({ cart, setCart }) {
   // Decrease quantity
   const decreaseQuantity = (product) => {
     setCart((previousCart) => {
-      const existingProduct = previousCart.find(
-        (item) =>
-          item.product_id === product.product_id
-      );
+      const existingProduct =
+        previousCart.find(
+          (item) =>
+            item.product_id ===
+            product.product_id
+        );
 
       if (!existingProduct) {
         return previousCart;
       }
 
-      if (existingProduct.quantity > 1) {
+      if (
+        Number(existingProduct.quantity) > 1
+      ) {
         return previousCart.map((item) =>
-          item.product_id === product.product_id
+          item.product_id ===
+          product.product_id
             ? {
                 ...item,
-                quantity: item.quantity - 1,
+                quantity:
+                  Number(item.quantity) - 1,
               }
             : item
         );
@@ -109,49 +143,58 @@ function Products({ cart, setCart }) {
 
       return previousCart.filter(
         (item) =>
-          item.product_id !== product.product_id
+          item.product_id !==
+          product.product_id
       );
     });
 
     setPendingQuantities((previous) => {
       const updated = { ...previous };
+
       delete updated[product.product_id];
+
       return updated;
     });
   };
 
   // Select quantity
-  const selectQuantity = (product, value) => {
+  const selectQuantity = (
+    product,
+    value
+  ) => {
     setPendingQuantities((previous) => ({
       ...previous,
-      [product.product_id]: Number(value),
+      [product.product_id]:
+        Number(value),
     }));
   };
 
   // Update quantity
   const updateQuantity = (product) => {
     const selectedQuantity =
-      pendingQuantities[product.product_id];
+      pendingQuantities[
+        product.product_id
+      ];
 
     if (
-      selectedQuantity === undefined ||
-      selectedQuantity === null
+      selectedQuantity === undefined
     ) {
       return;
     }
 
     setCart((previousCart) =>
       previousCart.map((item) =>
-        item.product_id === product.product_id
+        item.product_id ===
+        product.product_id
           ? {
               ...item,
-              quantity: selectedQuantity,
+              quantity:
+                selectedQuantity,
             }
           : item
       )
     );
 
-    // Remove temporary value
     setPendingQuantities((previous) => {
       const updated = { ...previous };
 
@@ -170,14 +213,21 @@ function Products({ cart, setCart }) {
   // Filter products
   let filteredProducts = products
     .filter((product) => {
-      if (selectedCategory === "All") {
+      if (
+        selectedCategory === "All"
+      ) {
         return true;
       }
 
-      return product.category === selectedCategory;
+      return (
+        product.category ===
+        selectedCategory
+      );
     })
     .filter((product) => {
-      if (selectedSubcategory === "All") {
+      if (
+        selectedSubcategory === "All"
+      ) {
         return true;
       }
 
@@ -187,23 +237,49 @@ function Products({ cart, setCart }) {
       );
     })
     .filter((product) =>
-      product.name
+      String(product.name)
         .toLowerCase()
-        .includes(search.toLowerCase())
+        .includes(
+          search.toLowerCase()
+        )
     );
 
   // Sort
   if (sort === "low") {
-    filteredProducts = [...filteredProducts].sort(
-      (a, b) =>
-        Number(a.price) - Number(b.price)
-    );
+    filteredProducts =
+      [...filteredProducts].sort(
+        (a, b) =>
+          Number(a.price) -
+          Number(b.price)
+      );
   }
 
   if (sort === "high") {
-    filteredProducts = [...filteredProducts].sort(
-      (a, b) =>
-        Number(b.price) - Number(a.price)
+    filteredProducts =
+      [...filteredProducts].sort(
+        (a, b) =>
+          Number(b.price) -
+          Number(a.price)
+      );
+  }
+
+  // Loading
+  if (loading) {
+    return (
+      <div className="products-page">
+        <h1>🛍️ ShopEasy Store</h1>
+
+        <div className="no-products">
+          <h2>
+            Loading products...
+          </h2>
+
+          <p>
+            Please wait while we load
+            the products.
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -216,7 +292,7 @@ function Products({ cart, setCart }) {
         Explore our wide range of products.
       </p>
 
-      {/* SEARCH */}
+      {/* FILTERS */}
 
       <div className="product-controls">
 
@@ -229,25 +305,25 @@ function Products({ cart, setCart }) {
           }
         />
 
-        {/* CATEGORY */}
-
         <select
           value={selectedCategory}
           onChange={(e) =>
-            changeCategory(e.target.value)
+            changeCategory(
+              e.target.value
+            )
           }
         >
-          {categories.map((category) => (
-            <option
-              key={category}
-              value={category}
-            >
-              {category}
-            </option>
-          ))}
+          {categories.map(
+            (category) => (
+              <option
+                key={category}
+                value={category}
+              >
+                {category}
+              </option>
+            )
+          )}
         </select>
-
-        {/* SUBCATEGORY */}
 
         {subcategories.length > 1 && (
           <select
@@ -270,8 +346,6 @@ function Products({ cart, setCart }) {
             )}
           </select>
         )}
-
-        {/* SORT */}
 
         <select
           value={sort}
@@ -298,21 +372,26 @@ function Products({ cart, setCart }) {
 
       <div className="category-buttons">
 
-        {categories.map((category) => (
-          <button
-            key={category}
-            className={
-              selectedCategory === category
-                ? "category-active"
-                : ""
-            }
-            onClick={() =>
-              changeCategory(category)
-            }
-          >
-            {category}
-          </button>
-        ))}
+        {categories.map(
+          (category) => (
+            <button
+              key={category}
+              className={
+                selectedCategory ===
+                category
+                  ? "category-active"
+                  : ""
+              }
+              onClick={() =>
+                changeCategory(
+                  category
+                )
+              }
+            >
+              {category}
+            </button>
+          )
+        )}
 
       </div>
 
@@ -330,216 +409,248 @@ function Products({ cart, setCart }) {
 
       <div className="product-container">
 
-        {filteredProducts.map((product) => {
+        {filteredProducts.map(
+          (product) => {
 
-          const cartProduct = cart.find(
-            (item) =>
-              item.product_id ===
-              product.product_id
-          );
+            const cartProduct =
+              cart.find(
+                (item) =>
+                  item.product_id ===
+                  product.product_id
+              );
 
-          const currentQuantity =
-            cartProduct
-              ? Number(cartProduct.quantity)
-              : 0;
+            const currentQuantity =
+              cartProduct
+                ? Number(
+                    cartProduct.quantity
+                  )
+                : 0;
 
-          const pendingQuantity =
-            pendingQuantities[
-              product.product_id
-            ];
+            const pendingQuantity =
+              pendingQuantities[
+                product.product_id
+              ];
 
-          const displayedQuantity =
-            pendingQuantity !== undefined
-              ? pendingQuantity
-              : currentQuantity;
+            const displayedQuantity =
+              pendingQuantity !==
+              undefined
+                ? pendingQuantity
+                : currentQuantity;
 
-          return (
-            <div
-              className="product-card"
-              key={product.product_id}
-            >
+            return (
+              <div
+                className="product-card"
+                key={
+                  product.product_id
+                }
+              >
 
-              {/* IMAGE */}
+                {/* CLICKABLE PRODUCT IMAGE */}
 
-              <div className="image-container">
+                <Link
+                  to={`/products/${product.product_id}`}
+                  className="product-details-link"
+                >
 
-                <img
-                  src={product.image_url}
-                  alt={product.name}
-                  className="product-image"
-                />
+                  <div className="image-container">
 
-              </div>
-
-              {/* CATEGORY */}
-
-              <span className="category">
-                {product.category}
-              </span>
-
-              {/* SUBCATEGORY */}
-
-              {product.subcategory && (
-                <span className="subcategory">
-                  {product.subcategory}
-                </span>
-              )}
-
-              {/* NAME */}
-
-              <h2>{product.name}</h2>
-
-              {/* DESCRIPTION */}
-
-              <p>
-                {product.description}
-              </p>
-
-              {/* RATING */}
-
-              <div className="rating">
-                ⭐⭐⭐⭐⭐
-              </div>
-
-              {/* PRICE */}
-
-              <h3>
-                ₹
-                {Number(
-                  product.price
-                ).toFixed(2)}
-              </h3>
-
-              {/* STOCK */}
-
-              <p className="stock">
-                {product.stock > 0
-                  ? `${product.stock} available`
-                  : "Out of Stock"}
-              </p>
-
-              {/* CART */}
-
-              {currentQuantity > 0 ? (
-
-                <>
-
-                  {/* QUANTITY CONTROL */}
-
-                  <div className="quantity-control">
-
-                    {/* MINUS */}
-
-                    <button
-                      onClick={() =>
-                        decreaseQuantity(
-                          product
-                        )
+                    <img
+                      src={
+                        product.image_url
                       }
-                    >
-                      −
-                    </button>
-
-                    {/* QUANTITY */}
-
-                    <select
-                      value={displayedQuantity}
-                      onChange={(e) =>
-                        selectQuantity(
-                          product,
-                          e.target.value
-                        )
-                      }
-                    >
-
-                      {Array.from(
-                        {
-                          length:
-                            Number(
-                              product.stock
-                            ),
-                        },
-                        (_, index) =>
-                          index + 1
-                      ).map((number) => (
-
-                        <option
-                          key={number}
-                          value={number}
-                        >
-                          {number}
-                        </option>
-
-                      ))}
-
-                    </select>
-
-                    {/* PLUS */}
-
-                    <button
-                      onClick={() =>
-                        addToCart(product)
-                      }
-                      disabled={
-                        currentQuantity >=
-                        Number(product.stock)
-                      }
-                    >
-                      +
-                    </button>
+                      alt={product.name}
+                      className="product-image"
+                    />
 
                   </div>
 
-                  {/* UPDATE */}
+                </Link>
 
-                  {pendingQuantity !==
-                    undefined &&
-                    pendingQuantity !==
-                      currentQuantity && (
+                {/* CATEGORY */}
+
+                <span className="category">
+                  {product.category}
+                </span>
+
+                {/* SUBCATEGORY */}
+
+                {product.subcategory && (
+                  <span className="subcategory">
+                    {
+                      product.subcategory
+                    }
+                  </span>
+                )}
+
+                {/* CLICKABLE PRODUCT NAME */}
+
+                <Link
+                  to={`/products/${product.product_id}`}
+                  className="product-details-link"
+                >
+                  <h2>
+                    {product.name}
+                  </h2>
+                </Link>
+
+                {/* DESCRIPTION */}
+
+                <p>
+                  {product.description}
+                </p>
+
+                {/* RATING */}
+
+                <div className="rating">
+                  ⭐⭐⭐⭐⭐
+                </div>
+
+                {/* PRICE */}
+
+                <h3>
+                  ₹
+                  {Number(
+                    product.price
+                  ).toFixed(2)}
+                </h3>
+
+                {/* STOCK */}
+
+                <p className="stock">
+                  {Number(
+                    product.stock
+                  ) > 0
+                    ? `${product.stock} available`
+                    : "Out of Stock"}
+                </p>
+
+                {/* CART CONTROLS */}
+
+                {currentQuantity > 0 ? (
+
+                  <>
+
+                    <div className="quantity-control">
 
                       <button
-                        className="update-quantity-button"
                         onClick={() =>
-                          updateQuantity(
+                          decreaseQuantity(
                             product
                           )
                         }
                       >
-                        Update
+                        −
                       </button>
 
-                    )}
+                      <select
+                        value={
+                          displayedQuantity
+                        }
+                        onChange={(e) =>
+                          selectQuantity(
+                            product,
+                            e.target.value
+                          )
+                        }
+                      >
 
-                </>
+                        {Array.from(
+                          {
+                            length:
+                              Number(
+                                product.stock
+                              ),
+                          },
+                          (_, index) =>
+                            index + 1
+                        ).map(
+                          (number) => (
+                            <option
+                              key={number}
+                              value={
+                                number
+                              }
+                            >
+                              {number}
+                            </option>
+                          )
+                        )}
 
-              ) : (
+                      </select>
 
-                /* ADD TO CART */
+                      <button
+                        onClick={() =>
+                          addToCart(
+                            product
+                          )
+                        }
+                        disabled={
+                          currentQuantity >=
+                          Number(
+                            product.stock
+                          )
+                        }
+                      >
+                        +
+                      </button>
 
-                <button
-                  className="add-button"
-                  onClick={() =>
-                    addToCart(product)
-                  }
-                  disabled={
-                    Number(product.stock) <=
-                    0
-                  }
-                >
-                  🛒 Add to Cart
-                </button>
+                    </div>
 
-              )}
+                    {/* UPDATE QUANTITY */}
 
-            </div>
-          );
-        })}
+                    {pendingQuantity !==
+                      undefined &&
+                      pendingQuantity !==
+                        currentQuantity && (
+
+                        <button
+                          className="update-quantity-button"
+                          onClick={() =>
+                            updateQuantity(
+                              product
+                            )
+                          }
+                        >
+                          Update
+                        </button>
+
+                      )}
+
+                  </>
+
+                ) : (
+
+                  /* ADD TO CART */
+
+                  <button
+                    className="add-button"
+                    onClick={() =>
+                      addToCart(
+                        product
+                      )
+                    }
+                    disabled={
+                      Number(
+                        product.stock
+                      ) <= 0
+                    }
+                  >
+                    🛒 Add to Cart
+                  </button>
+
+                )}
+
+              </div>
+            );
+          }
+        )}
 
       </div>
 
       {/* NO PRODUCTS */}
 
-      {filteredProducts.length === 0 && (
+      {filteredProducts.length ===
+        0 && (
 
         <div className="no-products">
 
@@ -548,8 +659,8 @@ function Products({ cart, setCart }) {
           </h2>
 
           <p>
-            Try another category or search
-            term.
+            Try another category or
+            search term.
           </p>
 
         </div>
